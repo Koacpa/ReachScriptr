@@ -1,13 +1,26 @@
+-- KOAS ZONE PREMIUM EDITION
+-- Monochrome UI with Player Stats
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
-local StarterGui = game:GetService("StarterGui")
 
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
 
--- == CONFIGURATION & STATE ==
+-- Get game info
+local gameInfo = {
+    name = "Loading...",
+    placeId = game.PlaceId
+}
+
+pcall(function()
+    gameInfo.name = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name
+end)
+
+-- State
 local state = {
     tankEnabled = false,
     reachEnabled = false,
@@ -17,1029 +30,842 @@ local state = {
     reachDistance = 8,
     hitboxParts = {},
     connections = {},
-    originalHealth = 100
+    originalHealth = humanoid.Health or 100
 }
 
--- == SPLASH SCREEN ==
+-- Splash Screen
 local splashGui = Instance.new("ScreenGui")
 splashGui.Name = "KoasSplash"
 splashGui.Parent = player:WaitForChild("PlayerGui")
-splashGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 splashGui.ResetOnSpawn = false
 splashGui.IgnoreGuiInset = true
 
 local splashBg = Instance.new("Frame")
 splashBg.Parent = splashGui
-splashBg.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+splashBg.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
 splashBg.BorderSizePixel = 0
 splashBg.Size = UDim2.new(1, 0, 1, 0)
 
 local splashText = Instance.new("TextLabel")
 splashText.Parent = splashBg
 splashText.BackgroundTransparency = 1
-splashText.Position = UDim2.new(0.5, 0, 0.5, 0)
+splashText.Position = UDim2.new(0.5, 0, 0.5, -20)
 splashText.AnchorPoint = Vector2.new(0.5, 0.5)
-splashText.Size = UDim2.new(0, 0, 0, 100)
+splashText.Size = UDim2.new(0, 600, 0, 80)
 splashText.Font = Enum.Font.GothamBold
 splashText.Text = "KOAS ZONE"
 splashText.TextColor3 = Color3.fromRGB(255, 255, 255)
 splashText.TextSize = 1
 splashText.TextTransparency = 1
 
-task.spawn(function()
-    for _ = 1, 3 do
-        TweenService:Create(splashText, TweenInfo.new(0.15), {TextTransparency = 0}):Play()
-        task.wait(0.15)
-        TweenService:Create(splashText, TweenInfo.new(0.15), {TextTransparency = 1}):Play()
-        task.wait(0.15)
+local splashSubtext = Instance.new("TextLabel")
+splashSubtext.Parent = splashBg
+splashSubtext.BackgroundTransparency = 1
+splashSubtext.Position = UDim2.new(0.5, 0, 0.5, 40)
+splashSubtext.AnchorPoint = Vector2.new(0.5, 0)
+splashSubtext.Size = UDim2.new(0, 400, 0, 30)
+splashSubtext.Font = Enum.Font.Gotham
+splashSubtext.Text = "PREMIUM EDITION"
+splashSubtext.TextColor3 = Color3.fromRGB(150, 150, 150)
+splashSubtext.TextSize = 16
+splashSubtext.TextTransparency = 1
+
+spawn(function()
+    for i = 1, 2 do
+        TweenService:Create(splashText, TweenInfo.new(0.2), {TextTransparency = 0}):Play()
+        TweenService:Create(splashSubtext, TweenInfo.new(0.2), {TextTransparency = 0}):Play()
+        task.wait(0.2)
+        TweenService:Create(splashText, TweenInfo.new(0.2), {TextTransparency = 1}):Play()
+        TweenService:Create(splashSubtext, TweenInfo.new(0.2), {TextTransparency = 1}):Play()
+        task.wait(0.2)
     end
 
     TweenService:Create(splashText, TweenInfo.new(0.3), {TextTransparency = 0}):Play()
-    TweenService:Create(
-        splashText,
-        TweenInfo.new(1, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
-        {TextSize = 80, Size = UDim2.new(0, 600, 0, 100)}
-    ):Play()
+    TweenService:Create(splashSubtext, TweenInfo.new(0.3), {TextTransparency = 0}):Play()
+    TweenService:Create(splashText, TweenInfo.new(0.8, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        TextSize = 64
+    }):Play()
 
     task.wait(1.5)
 
-    TweenService:Create(splashBg, TweenInfo.new(0.5), {BackgroundTransparency = 1}):Play()
-    TweenService:Create(splashText, TweenInfo.new(0.5), {TextTransparency = 1}):Play()
-    task.wait(0.5)
+    TweenService:Create(splashBg, TweenInfo.new(0.4), {BackgroundTransparency = 1}):Play()
+    TweenService:Create(splashText, TweenInfo.new(0.4), {TextTransparency = 1}):Play()
+    TweenService:Create(splashSubtext, TweenInfo.new(0.4), {TextTransparency = 1}):Play()
+    task.wait(0.4)
     splashGui:Destroy()
 end)
 
-task.wait(3)
+task.wait(2.5)
 
--- == UI CREATION ==
+-- Main GUI
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "KoasZoneHub"
 screenGui.Parent = player:WaitForChild("PlayerGui")
-screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 screenGui.ResetOnSpawn = false
 screenGui.IgnoreGuiInset = true
 
--- main floating frame (no black full‑screen background)
+local bgDim = Instance.new("Frame")
+bgDim.Parent = screenGui
+bgDim.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+bgDim.BackgroundTransparency = 0.5
+bgDim.Size = UDim2.new(1, 0, 1, 0)
+
 local mainFrame = Instance.new("Frame")
-mainFrame.Name = "MainFrame"
 mainFrame.Parent = screenGui
-mainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-mainFrame.BackgroundTransparency = 0.1
+mainFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
 mainFrame.BorderSizePixel = 0
-mainFrame.Position = UDim2.new(0.5, -260, 0.5, -230)
-mainFrame.Size = UDim2.new(0, 520, 0, 480)
+mainFrame.Position = UDim2.new(0.5, -300, 0.5, -280)
+mainFrame.Size = UDim2.new(0, 600, 0, 560)
 mainFrame.ClipsDescendants = true
 
-local mainCorner = Instance.new("UICorner")
-mainCorner.CornerRadius = UDim.new(0, 18)
-mainCorner.Parent = mainFrame
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 14)
 
-local mainStroke = Instance.new("UIStroke")
-mainStroke.Thickness = 1.4
-mainStroke.Color = Color3.fromRGB(255, 255, 255)
-mainStroke.Transparency = 0.75
-mainStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-mainStroke.Parent = mainFrame
+local stroke = Instance.new("UIStroke")
+stroke.Thickness = 1
+stroke.Color = Color3.fromRGB(60, 60, 60)
+stroke.Transparency = 0.4
+stroke.Parent = mainFrame
 
-local mainPadding = Instance.new("UIPadding")
-mainPadding.Parent = mainFrame
-mainPadding.PaddingLeft = UDim.new(0, 14)
-mainPadding.PaddingRight = UDim.new(0, 14)
-mainPadding.PaddingTop = UDim.new(0, 12)
-mainPadding.PaddingBottom = UDim.new(0, 12)
+-- User Info Panel
+local userPanel = Instance.new("Frame")
+userPanel.Parent = mainFrame
+userPanel.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
+userPanel.Size = UDim2.new(1, 0, 0, 110)
 
--- Title bar
-local titleBar = Instance.new("Frame")
-titleBar.Name = "TitleBar"
-titleBar.Parent = mainFrame
-titleBar.BackgroundTransparency = 1
-titleBar.Size = UDim2.new(1, 0, 0, 48)
+Instance.new("UICorner", userPanel).CornerRadius = UDim.new(0, 14)
 
-local titleLayout = Instance.new("UIListLayout")
-titleLayout.FillDirection = Enum.FillDirection.Horizontal
-titleLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
-titleLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-titleLayout.Padding = UDim.new(0, 10)
-titleLayout.Parent = titleBar
+local panelStroke = Instance.new("UIStroke")
+panelStroke.Thickness = 1
+panelStroke.Color = Color3.fromRGB(40, 40, 40)
+panelStroke.Transparency = 0.6
+panelStroke.Parent = userPanel
 
-local titleLeft = Instance.new("Frame")
-titleLeft.Name = "TitleLeft"
-titleLeft.Parent = titleBar
-titleLeft.BackgroundTransparency = 1
-titleLeft.Size = UDim2.new(1, -120, 1, 0)
+-- Avatar
+local avatar = Instance.new("ImageLabel")
+avatar.Parent = userPanel
+avatar.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+avatar.Position = UDim2.new(0, 15, 0, 15)
+avatar.Size = UDim2.new(0, 80, 0, 80)
+avatar.Image = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. player.UserId .. "&width=150&height=150&format=png"
 
-local leftLayout = Instance.new("UIListLayout")
-leftLayout.FillDirection = Enum.FillDirection.Horizontal
-leftLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
-leftLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-leftLayout.Padding = UDim.new(0, 10)
-leftLayout.Parent = titleLeft
+Instance.new("UICorner", avatar).CornerRadius = UDim.new(0, 10)
 
-local logo = Instance.new("Frame")
-logo.Name = "Logo"
-logo.Parent = titleLeft
-logo.Size = UDim2.new(0, 32, 0, 32)
-logo.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-logo.BackgroundTransparency = 0.85
+local avatarStroke = Instance.new("UIStroke")
+avatarStroke.Thickness = 2
+avatarStroke.Color = Color3.fromRGB(255, 255, 255)
+avatarStroke.Transparency = 0.85
+avatarStroke.Parent = avatar
 
-local logoCorner = Instance.new("UICorner")
-logoCorner.CornerRadius = UDim.new(0, 10)
-logoCorner.Parent = logo
+-- User Details
+local detailsFrame = Instance.new("Frame")
+detailsFrame.Parent = userPanel
+detailsFrame.BackgroundTransparency = 1
+detailsFrame.Position = UDim2.new(0, 105, 0, 15)
+detailsFrame.Size = UDim2.new(1, -125, 1, -30)
 
-local logoStroke = Instance.new("UIStroke")
-logoStroke.Color = Color3.fromRGB(255, 255, 255)
-logoStroke.Transparency = 0.4
-logoStroke.Thickness = 1
-logoStroke.Parent = logo
+local detailsLayout = Instance.new("UIListLayout")
+detailsLayout.Parent = detailsFrame
+detailsLayout.Padding = UDim.new(0, 3)
 
-local logoLabel = Instance.new("TextLabel")
-logoLabel.Parent = logo
-logoLabel.BackgroundTransparency = 1
-logoLabel.Size = UDim2.new(1, 0, 1, 0)
-logoLabel.Font = Enum.Font.GothamBold
-logoLabel.Text = "K"
-logoLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-logoLabel.TextScaled = true
+local function createLabel(text, bold, size)
+    local label = Instance.new("TextLabel")
+    label.Parent = detailsFrame
+    label.BackgroundTransparency = 1
+    label.Size = UDim2.new(1, 0, 0, size or 18)
+    label.Font = bold and Enum.Font.GothamBold or Enum.Font.Gotham
+    label.Text = text
+    label.TextColor3 = bold and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(160, 160, 160)
+    label.TextSize = bold and 16 or 13
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.TextTruncate = Enum.TextTruncate.AtEnd
+    return label
+end
 
-local titleTextContainer = Instance.new("Frame")
-titleTextContainer.Name = "TitleTextContainer"
-titleTextContainer.Parent = titleLeft
-titleTextContainer.BackgroundTransparency = 1
-titleTextContainer.Size = UDim2.new(1, -42, 1, 0)
+createLabel("@" .. player.Name, true, 20)
+createLabel("ID: " .. player.UserId, false)
+createLabel("Game: " .. gameInfo.name, false)
 
-local titleTextLayout = Instance.new("UIListLayout")
-titleTextLayout.FillDirection = Enum.FillDirection.Vertical
-titleTextLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
-titleTextLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-titleTextLayout.Parent = titleTextContainer
+-- Health Bar
+local healthFrame = Instance.new("Frame")
+healthFrame.Parent = detailsFrame
+healthFrame.BackgroundTransparency = 1
+healthFrame.Size = UDim2.new(1, 0, 0, 22)
 
-local titleLabel = Instance.new("TextLabel")
-titleLabel.Parent = titleTextContainer
-titleLabel.BackgroundTransparency = 1
-titleLabel.Size = UDim2.new(1, 0, 0, 22)
-titleLabel.Font = Enum.Font.GothamBold
-titleLabel.Text = "KOAS ZONE"
-titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.TextSize = 22
-titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+local healthLabel = Instance.new("TextLabel")
+healthLabel.Parent = healthFrame
+healthLabel.BackgroundTransparency = 1
+healthLabel.Size = UDim2.new(0, 50, 1, 0)
+healthLabel.Font = Enum.Font.GothamBold
+healthLabel.Text = "HP"
+healthLabel.TextColor3 = Color3.fromRGB(160, 160, 160)
+healthLabel.TextSize = 12
+healthLabel.TextXAlignment = Enum.TextXAlignment.Left
 
-local subtitleLabel = Instance.new("TextLabel")
-subtitleLabel.Parent = titleTextContainer
-subtitleLabel.BackgroundTransparency = 1
-subtitleLabel.Size = UDim2.new(1, 0, 0, 18)
-subtitleLabel.Font = Enum.Font.Gotham
-subtitleLabel.Text = "Combat Enhancer"
-subtitleLabel.TextColor3 = Color3.fromRGB(160, 160, 160)
-subtitleLabel.TextSize = 14
-subtitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+local healthBg = Instance.new("Frame")
+healthBg.Parent = healthFrame
+healthBg.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+healthBg.BorderSizePixel = 0
+healthBg.Position = UDim2.new(0, 35, 0, 4)
+healthBg.Size = UDim2.new(1, -40, 0, 14)
 
-local titleRight = Instance.new("Frame")
-titleRight.Name = "TitleRight"
-titleRight.Parent = titleBar
-titleRight.BackgroundTransparency = 1
-titleRight.Size = UDim2.new(0, 110, 1, 0)
+Instance.new("UICorner", healthBg).CornerRadius = UDim.new(1, 0)
 
-local rightLayout = Instance.new("UIListLayout")
-rightLayout.FillDirection = Enum.FillDirection.Horizontal
-rightLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
-rightLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-rightLayout.Padding = UDim.new(0, 6)
-rightLayout.Parent = titleRight
+local healthBar = Instance.new("Frame")
+healthBar.Parent = healthBg
+healthBar.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+healthBar.BorderSizePixel = 0
+healthBar.Size = UDim2.new(1, 0, 1, 0)
 
-local function createTitleButton(text, baseColor)
+Instance.new("UICorner", healthBar).CornerRadius = UDim.new(1, 0)
+
+local healthText = Instance.new("TextLabel")
+healthText.Parent = healthBg
+healthText.BackgroundTransparency = 1
+healthText.Size = UDim2.new(1, 0, 1, 0)
+healthText.Font = Enum.Font.GothamBold
+healthText.Text = "100/100"
+healthText.TextColor3 = Color3.fromRGB(0, 0, 0)
+healthText.TextSize = 10
+healthText.ZIndex = 2
+
+-- Update health
+spawn(function()
+    while task.wait(0.1) do
+        if humanoid and humanoid.Parent then
+            local pct = humanoid.Health / humanoid.MaxHealth
+            healthBar.Size = UDim2.new(pct, 0, 1, 0)
+            healthText.Text = math.floor(humanoid.Health) .. "/" .. math.floor(humanoid.MaxHealth)
+            
+            if pct > 0.6 then
+                healthBar.BackgroundColor3 = Color3.fromRGB(200, 255, 200)
+            elseif pct > 0.3 then
+                healthBar.BackgroundColor3 = Color3.fromRGB(255, 220, 100)
+            else
+                healthBar.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
+            end
+        end
+    end
+end)
+
+-- Title
+local title = Instance.new("TextLabel")
+title.Parent = mainFrame
+title.BackgroundTransparency = 1
+title.Position = UDim2.new(0, 0, 0, 120)
+title.Size = UDim2.new(1, 0, 0, 40)
+title.Font = Enum.Font.GothamBold
+title.Text = "KOAS ZONE"
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.TextSize = 22
+
+-- Controls
+local controls = Instance.new("Frame")
+controls.Parent = mainFrame
+controls.BackgroundTransparency = 1
+controls.Position = UDim2.new(1, -90, 0, 8)
+controls.Size = UDim2.new(0, 85, 0, 30)
+
+local controlLayout = Instance.new("UIListLayout")
+controlLayout.Parent = controls
+controlLayout.FillDirection = Enum.FillDirection.Horizontal
+controlLayout.Padding = UDim.new(0, 8)
+
+local function createBtn(txt, color)
     local btn = Instance.new("TextButton")
-    btn.BackgroundColor3 = baseColor
-    btn.BorderSizePixel = 0
-    btn.Size = UDim2.new(0, 34, 0, 34)
+    btn.Parent = controls
+    btn.BackgroundColor3 = color
+    btn.Size = UDim2.new(0, 30, 0, 30)
     btn.Font = Enum.Font.GothamBold
-    btn.Text = text
+    btn.Text = txt
     btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.TextSize = 20
+    btn.TextSize = 16
     btn.AutoButtonColor = false
-
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(1, 0)
-    corner.Parent = btn
-
+    
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+    
+    local s = Instance.new("UIStroke")
+    s.Thickness = 1
+    s.Color = Color3.fromRGB(255, 255, 255)
+    s.Transparency = 0.8
+    s.Parent = btn
+    
     btn.MouseEnter:Connect(function()
-        TweenService:Create(btn, TweenInfo.new(0.15), {
-            BackgroundColor3 = baseColor:lerp(Color3.fromRGB(255, 255, 255), 0.15),
-            Size = UDim2.new(0, 37, 0, 37)
-        }):Play()
+        TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = color:lerp(Color3.fromRGB(255, 255, 255), 0.2)}):Play()
     end)
-
+    
     btn.MouseLeave:Connect(function()
-        TweenService:Create(btn, TweenInfo.new(0.15), {
-            BackgroundColor3 = baseColor,
-            Size = UDim2.new(0, 34, 0, 34)
-        }):Play()
+        TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = color}):Play()
     end)
-
+    
     return btn
 end
 
-local minimizeButton = createTitleButton("−", Color3.fromRGB(60, 60, 60))
-minimizeButton.Name = "MinimizeButton"
-minimizeButton.Parent = titleRight
+local minBtn = createBtn("−", Color3.fromRGB(40, 40, 40))
+local closeBtn = createBtn("×", Color3.fromRGB(80, 30, 30))
 
-local closeButton = createTitleButton("×", Color3.fromRGB(90, 40, 40))
-closeButton.Name = "CloseButton"
-closeButton.Parent = titleRight
+local isMin = false
+minBtn.MouseButton1Click:Connect(function()
+    isMin = not isMin
+    TweenService:Create(mainFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quad), {
+        Size = UDim2.new(0, 600, 0, isMin and 110 or 560)
+    }):Play()
+end)
 
-local isMinimized = false
-
-closeButton.MouseButton1Click:Connect(function()
-    TweenService:Create(
-        mainFrame,
-        TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.In),
-        {Size = UDim2.new(0, 0, 0, 0), BackgroundTransparency = 1}
-    ):Play()
-    task.wait(0.25)
+closeBtn.MouseButton1Click:Connect(function()
+    TweenService:Create(mainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
+        Size = UDim2.new(0, 0, 0, 0)
+    }):Play()
+    TweenService:Create(bgDim, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play()
+    task.wait(0.3)
     screenGui:Destroy()
 end)
 
-minimizeButton.MouseButton1Click:Connect(function()
-    isMinimized = not isMinimized
-    if isMinimized then
-        TweenService:Create(
-            mainFrame,
-            TweenInfo.new(0.25, Enum.EasingStyle.Quad),
-            {Size = UDim2.new(0, 520, 0, 70)}
-        ):Play()
-    else
-        TweenService:Create(
-            mainFrame,
-            TweenInfo.new(0.25, Enum.EasingStyle.Quad),
-            {Size = UDim2.new(0, 520, 0, 480)}
-        ):Play()
-    end
-end)
+-- Divider
+local div = Instance.new("Frame")
+div.Parent = mainFrame
+div.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+div.BackgroundTransparency = 0.6
+div.BorderSizePixel = 0
+div.Position = UDim2.new(0, 20, 0, 165)
+div.Size = UDim2.new(1, -40, 0, 1)
 
--- Divider under title
-local divider = Instance.new("Frame")
-divider.Name = "Divider"
-divider.Parent = mainFrame
-divider.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-divider.BackgroundTransparency = 0.8
-divider.BorderSizePixel = 0
-divider.Position = UDim2.new(0, 0, 0, 52)
-divider.Size = UDim2.new(1, 0, 0, 1)
-
--- == PLAYER INFO HEADER ==
-local playerInfo = Instance.new("Frame")
-playerInfo.Name = "PlayerInfo"
-playerInfo.Parent = mainFrame
-playerInfo.BackgroundTransparency = 1
-playerInfo.Position = UDim2.new(0, 0, 0, 56)
-playerInfo.Size = UDim2.new(1, 0, 0, 80)
-
-local infoLayout = Instance.new("UIListLayout")
-infoLayout.FillDirection = Enum.FillDirection.Horizontal
-infoLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
-infoLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-infoLayout.Padding = UDim.new(0, 10)
-infoLayout.Parent = playerInfo
-
--- avatar circle
-local avatarHolder = Instance.new("Frame")
-avatarHolder.Name = "AvatarHolder"
-avatarHolder.Parent = playerInfo
-avatarHolder.BackgroundTransparency = 1
-avatarHolder.Size = UDim2.new(0, 64, 0, 64)
-
-local avatarImage = Instance.new("ImageLabel")
-avatarImage.Parent = avatarHolder
-avatarImage.BackgroundTransparency = 1
-avatarImage.Size = UDim2.new(1, 0, 1, 0)
-avatarImage.ScaleType = Enum.ScaleType.Crop
-
-local avatarCorner = Instance.new("UICorner")
-avatarCorner.CornerRadius = UDim.new(1, 0)
-avatarCorner.Parent = avatarImage
-
-local avatarStroke = Instance.new("UIStroke")
-avatarStroke.Color = Color3.fromRGB(255, 255, 255)
-avatarStroke.Transparency = 0.4
-avatarStroke.Thickness = 1
-avatarStroke.Parent = avatarImage
-
--- load avatar headshot
-local thumbType = Enum.ThumbnailType.HeadShot
-local thumbSize = Enum.ThumbnailSize.Size100x100
-local content, _ = Players:GetUserThumbnailAsync(player.UserId, thumbType, thumbSize)
-avatarImage.Image = content  -- Roblox API provides thumbnail URL
-
--- text info
-local infoTextFrame = Instance.new("Frame")
-infoTextFrame.Name = "InfoText"
-infoTextFrame.Parent = playerInfo
-infoTextFrame.BackgroundTransparency = 1
-infoTextFrame.Size = UDim2.new(1, -80, 1, 0)
-
-local infoTextLayout = Instance.new("UIListLayout")
-infoTextLayout.FillDirection = Enum.FillDirection.Vertical
-infoTextLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
-infoTextLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-infoTextLayout.Parent = infoTextFrame
-
-local nameLabel = Instance.new("TextLabel")
-nameLabel.Parent = infoTextFrame
-nameLabel.BackgroundTransparency = 1
-nameLabel.Size = UDim2.new(1, 0, 0, 22)
-nameLabel.Font = Enum.Font.GothamBold
-nameLabel.Text = player.Name .. "  |  ID: " .. player.UserId
-nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-nameLabel.TextSize = 18
-nameLabel.TextXAlignment = Enum.TextXAlignment.Left
-
-local extraLabel1 = Instance.new("TextLabel")
-extraLabel1.Parent = infoTextFrame
-extraLabel1.BackgroundTransparency = 1
-extraLabel1.Size = UDim2.new(1, 0, 0, 18)
-extraLabel1.Font = Enum.Font.Gotham
-extraLabel1.TextColor3 = Color3.fromRGB(180, 180, 180)
-extraLabel1.TextSize = 13
-extraLabel1.TextXAlignment = Enum.TextXAlignment.Left
-extraLabel1.Text = "Health: loading..."
-
-local extraLabel2 = Instance.new("TextLabel")
-extraLabel2.Parent = infoTextFrame
-extraLabel2.BackgroundTransparency = 1
-extraLabel2.Size = UDim2.new(1, 0, 0, 18)
-extraLabel2.Font = Enum.Font.Gotham
-extraLabel2.TextColor3 = Color3.fromRGB(150, 150, 150)
-extraLabel2.TextSize = 13
-extraLabel2.TextXAlignment = Enum.TextXAlignment.Left
-extraLabel2.Text = "Game: " .. (game.Name ~= "" and game.Name or "Unnamed place")
-
--- update health display
-task.spawn(function()
-    local hum = character:FindFirstChildOfClass("Humanoid")
-    if hum then
-        extraLabel1.Text = "Health: " .. math.floor(hum.Health) .. " / " .. math.floor(hum.MaxHealth)
-        hum.HealthChanged:Connect(function(h)
-            extraLabel1.Text = "Health: " .. math.floor(h) .. " / " .. math.floor(hum.MaxHealth)
-        end)
-    else
-        extraLabel1.Text = "Health: N/A"
-    end
-end)
-
--- second divider under player info
-local divider2 = Instance.new("Frame")
-divider2.Name = "Divider2"
-divider2.Parent = mainFrame
-divider2.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-divider2.BackgroundTransparency = 0.85
-divider2.BorderSizePixel = 0
-divider2.Position = UDim2.new(0, 0, 0, 140)
-divider2.Size = UDim2.new(1, 0, 0, 1)
-
--- Content Frame
-local contentFrame = Instance.new("ScrollingFrame")
-contentFrame.Name = "ContentFrame"
-contentFrame.Parent = mainFrame
-contentFrame.Active = true
-contentFrame.BackgroundTransparency = 1
-contentFrame.BorderSizePixel = 0
-contentFrame.Position = UDim2.new(0, 4, 0, 148)
-contentFrame.Size = UDim2.new(1, -8, 1, -160)
-contentFrame.ScrollBarThickness = 4
-contentFrame.ScrollBarImageColor3 = Color3.fromRGB(160, 160, 160)
-contentFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+-- Content
+local content = Instance.new("ScrollingFrame")
+content.Parent = mainFrame
+content.BackgroundTransparency = 1
+content.BorderSizePixel = 0
+content.Position = UDim2.new(0, 20, 0, 180)
+content.Size = UDim2.new(1, -40, 1, -200)
+content.ScrollBarThickness = 3
+content.ScrollBarImageColor3 = Color3.fromRGB(80, 80, 80)
+content.CanvasSize = UDim2.new(0, 0, 0, 0)
 
 local contentLayout = Instance.new("UIListLayout")
-contentLayout.Parent = contentFrame
+contentLayout.Parent = content
 contentLayout.Padding = UDim.new(0, 10)
-contentLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
 contentLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-    contentFrame.CanvasSize = UDim2.new(0, 0, 0, contentLayout.AbsoluteContentSize.Y + 10)
+    content.CanvasSize = UDim2.new(0, 0, 0, contentLayout.AbsoluteContentSize.Y + 10)
 end)
 
--- card helper
+-- Card maker
 local function createCard()
-    local container = Instance.new("Frame")
-    container.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
-    container.BackgroundTransparency = 0.1
-    container.BorderSizePixel = 0
-    container.Size = UDim2.new(1, 0, 0, 70)
-
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 12)
-    corner.Parent = container
-
-    local stroke = Instance.new("UIStroke")
-    stroke.Color = Color3.fromRGB(255, 255, 255)
-    stroke.Transparency = 0.85
-    stroke.Thickness = 1
-    stroke.Parent = container
-
+    local card = Instance.new("Frame")
+    card.Parent = content
+    card.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
+    card.BorderSizePixel = 0
+    card.Size = UDim2.new(1, 0, 0, 70)
+    
+    Instance.new("UICorner", card).CornerRadius = UDim.new(0, 10)
+    
+    local s = Instance.new("UIStroke")
+    s.Color = Color3.fromRGB(50, 50, 50)
+    s.Transparency = 0.5
+    s.Thickness = 1
+    s.Parent = card
+    
     local pad = Instance.new("UIPadding")
-    pad.Parent = container
+    pad.Parent = card
     pad.PaddingLeft = UDim.new(0, 18)
     pad.PaddingRight = UDim.new(0, 18)
     pad.PaddingTop = UDim.new(0, 10)
     pad.PaddingBottom = UDim.new(0, 10)
-
-    local hoverHighlight = Instance.new("Frame")
-    hoverHighlight.Parent = container
-    hoverHighlight.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    hoverHighlight.BackgroundTransparency = 1
-    hoverHighlight.BorderSizePixel = 0
-    hoverHighlight.Size = UDim2.new(1, 0, 1, 0)
-    hoverHighlight.ZIndex = 0
-
-    local hoverCorner = Instance.new("UICorner")
-    hoverCorner.CornerRadius = UDim.new(0, 12)
-    hoverCorner.Parent = hoverHighlight
-
-    container.MouseEnter:Connect(function()
-        TweenService:Create(hoverHighlight, TweenInfo.new(0.15), {BackgroundTransparency = 0.93}):Play()
+    
+    local hover = Instance.new("Frame")
+    hover.Parent = card
+    hover.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    hover.BackgroundTransparency = 1
+    hover.BorderSizePixel = 0
+    hover.Size = UDim2.new(1, 0, 1, 0)
+    hover.ZIndex = 0
+    
+    Instance.new("UICorner", hover).CornerRadius = UDim.new(0, 10)
+    
+    card.MouseEnter:Connect(function()
+        TweenService:Create(hover, TweenInfo.new(0.2), {BackgroundTransparency = 0.96}):Play()
+        TweenService:Create(s, TweenInfo.new(0.2), {Transparency = 0.2}):Play()
     end)
-    container.MouseLeave:Connect(function()
-        TweenService:Create(hoverHighlight, TweenInfo.new(0.15), {BackgroundTransparency = 1}):Play()
+    
+    card.MouseLeave:Connect(function()
+        TweenService:Create(hover, TweenInfo.new(0.2), {BackgroundTransparency = 1}):Play()
+        TweenService:Create(s, TweenInfo.new(0.2), {Transparency = 0.5}):Play()
     end)
-
-    return container
+    
+    return card
 end
 
--- toggles
-local function createToggle(text, layoutOrder, stateKey, description)
-    local container = createCard()
-    container.Name = text .. "Card"
-    container.Parent = contentFrame
-    container.LayoutOrder = layoutOrder
+local updateFeatures
 
+-- Toggle creator
+local function createToggle(txt, order, key, desc)
+    local card = createCard()
+    card.LayoutOrder = order
+    
     local title = Instance.new("TextLabel")
-    title.Parent = container
+    title.Parent = card
     title.BackgroundTransparency = 1
-    title.Size = UDim2.new(1, -120, 0, 22)
+    title.Size = UDim2.new(1, -90, 0, 20)
     title.Font = Enum.Font.GothamBold
-    title.Text = text
+    title.Text = txt
     title.TextColor3 = Color3.fromRGB(255, 255, 255)
-    title.TextSize = 18
+    title.TextSize = 16
     title.TextXAlignment = Enum.TextXAlignment.Left
-
-    local subtitle = Instance.new("TextLabel")
-    subtitle.Parent = container
-    subtitle.BackgroundTransparency = 1
-    subtitle.Position = UDim2.new(0, 0, 0, 24)
-    subtitle.Size = UDim2.new(1, -120, 0, 20)
-    subtitle.Font = Enum.Font.Gotham
-    subtitle.Text = description or "Toggle this feature."
-    subtitle.TextColor3 = Color3.fromRGB(145, 145, 145)
-    subtitle.TextSize = 13
-    subtitle.TextXAlignment = Enum.TextXAlignment.Left
-
+    
+    local sub = Instance.new("TextLabel")
+    sub.Parent = card
+    sub.BackgroundTransparency = 1
+    sub.Position = UDim2.new(0, 0, 0, 22)
+    sub.Size = UDim2.new(1, -90, 0, 16)
+    sub.Font = Enum.Font.Gotham
+    sub.Text = desc
+    sub.TextColor3 = Color3.fromRGB(130, 130, 130)
+    sub.TextSize = 12
+    sub.TextXAlignment = Enum.TextXAlignment.Left
+    
     local toggleBg = Instance.new("Frame")
-    toggleBg.Name = "ToggleBg"
-    toggleBg.Parent = container
-    toggleBg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    toggleBg.Parent = card
+    toggleBg.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
     toggleBg.BorderSizePixel = 0
     toggleBg.AnchorPoint = Vector2.new(1, 0.5)
-    toggleBg.Position = UDim2.new(1, -4, 0.5, 0)
-    toggleBg.Size = UDim2.new(0, 70, 0, 30)
+    toggleBg.Position = UDim2.new(1, 0, 0.5, 0)
+    toggleBg.Size = UDim2.new(0, 55, 0, 26)
     toggleBg.ZIndex = 3
-
-    local toggleCorner = Instance.new("UICorner")
-    toggleCorner.CornerRadius = UDim.new(1, 0)
-    toggleCorner.Parent = toggleBg
-
-    local toggleCircle = Instance.new("Frame")
-    toggleCircle.Name = "Circle"
-    toggleCircle.Parent = toggleBg
-    toggleCircle.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
-    toggleCircle.BorderSizePixel = 0
-    toggleCircle.Position = UDim2.new(0, 3, 0.5, -12)
-    toggleCircle.Size = UDim2.new(0, 24, 0, 24)
-    toggleCircle.ZIndex = 4
-
-    local circleCorner = Instance.new("UICorner")
-    circleCorner.CornerRadius = UDim.new(1, 0)
-    circleCorner.Parent = toggleCircle
-
-    local button = Instance.new("TextButton")
-    button.Name = "Button"
-    button.Parent = toggleBg
-    button.BackgroundTransparency = 1
-    button.Size = UDim2.new(1, 0, 1, 0)
-    button.Text = ""
-    button.ZIndex = 5
-
-    local statusLabel = Instance.new("TextLabel")
-    statusLabel.Parent = container
-    statusLabel.BackgroundTransparency = 1
-    statusLabel.Position = UDim2.new(0, 0, 1, -18)
-    statusLabel.Size = UDim2.new(1, -120, 0, 16)
-    statusLabel.Font = Enum.Font.Gotham
-    statusLabel.Text = "Disabled"
-    statusLabel.TextColor3 = Color3.fromRGB(120, 120, 120)
-    statusLabel.TextSize = 12
-    statusLabel.TextXAlignment = Enum.TextXAlignment.Left
-
-    button.MouseButton1Click:Connect(function()
-        state[stateKey] = not state[stateKey]
-        local tweenInfo = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-
-        if state[stateKey] then
-            TweenService:Create(toggleBg, tweenInfo, {BackgroundColor3 = Color3.fromRGB(200, 200, 200)}):Play()
-            TweenService:Create(toggleCircle, tweenInfo, {
-                Position = UDim2.new(1, -27, 0.5, -12),
-                BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    
+    Instance.new("UICorner", toggleBg).CornerRadius = UDim.new(1, 0)
+    
+    local toggleS = Instance.new("UIStroke")
+    toggleS.Thickness = 1.5
+    toggleS.Color = Color3.fromRGB(60, 60, 60)
+    toggleS.Transparency = 0.5
+    toggleS.Parent = toggleBg
+    
+    local circle = Instance.new("Frame")
+    circle.Parent = toggleBg
+    circle.BackgroundColor3 = Color3.fromRGB(160, 160, 160)
+    circle.BorderSizePixel = 0
+    circle.Position = UDim2.new(0, 3, 0.5, -10)
+    circle.Size = UDim2.new(0, 20, 0, 20)
+    circle.ZIndex = 4
+    
+    Instance.new("UICorner", circle).CornerRadius = UDim.new(1, 0)
+    
+    local btn = Instance.new("TextButton")
+    btn.Parent = toggleBg
+    btn.BackgroundTransparency = 1
+    btn.Size = UDim2.new(1, 0, 1, 0)
+    btn.Text = ""
+    btn.ZIndex = 5
+    
+    local status = Instance.new("TextLabel")
+    status.Parent = card
+    status.BackgroundTransparency = 1
+    status.Position = UDim2.new(0, 0, 1, -14)
+    status.Size = UDim2.new(1, -90, 0, 12)
+    status.Font = Enum.Font.GothamBold
+    status.Text = "• DISABLED"
+    status.TextColor3 = Color3.fromRGB(90, 90, 90)
+    status.TextSize = 10
+    status.TextXAlignment = Enum.TextXAlignment.Left
+    
+    btn.MouseButton1Click:Connect(function()
+        state[key] = not state[key]
+        local t = TweenInfo.new(0.25, Enum.EasingStyle.Quad)
+        
+        if state[key] then
+            TweenService:Create(toggleBg, t, {BackgroundColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+            TweenService:Create(circle, t, {
+                Position = UDim2.new(1, -23, 0.5, -10),
+                BackgroundColor3 = Color3.fromRGB(18, 18, 18)
             }):Play()
-            statusLabel.Text = "Enabled"
-            statusLabel.TextColor3 = Color3.fromRGB(230, 230, 230)
+            status.Text = "• ENABLED"
+            status.TextColor3 = Color3.fromRGB(200, 200, 200)
         else
-            TweenService:Create(toggleBg, tweenInfo, {BackgroundColor3 = Color3.fromRGB(50, 50, 50)}):Play()
-            TweenService:Create(toggleCircle, tweenInfo, {
-                Position = UDim2.new(0, 3, 0.5, -12),
-                BackgroundColor3 = Color3.fromRGB(200, 200, 200)
+            TweenService:Create(toggleBg, t, {BackgroundColor3 = Color3.fromRGB(30, 30, 30)}):Play()
+            TweenService:Create(circle, t, {
+                Position = UDim2.new(0, 3, 0.5, -10),
+                BackgroundColor3 = Color3.fromRGB(160, 160, 160)
             }):Play()
-            statusLabel.Text = "Disabled"
-            statusLabel.TextColor3 = Color3.fromRGB(120, 120, 120)
+            status.Text = "• DISABLED"
+            status.TextColor3 = Color3.fromRGB(90, 90, 90)
         end
-
+        
         updateFeatures()
     end)
 end
 
--- sliders
-local function createSlider(text, layoutOrder, stateKey, min, max, suffix, description)
-    local container = createCard()
-    container.Name = text .. "Card"
-    container.Parent = contentFrame
-    container.LayoutOrder = layoutOrder
-    container.Size = UDim2.new(1, 0, 0, 78)
-
-    local label = Instance.new("TextLabel")
-    label.Parent = container
-    label.BackgroundTransparency = 1
-    label.Size = UDim2.new(0.55, 0, 0, 22)
-    label.Font = Enum.Font.GothamBold
-    label.Text = text
-    label.TextColor3 = Color3.fromRGB(255, 255, 255)
-    label.TextSize = 16
-    label.TextXAlignment = Enum.TextXAlignment.Left
-
+-- Slider creator
+local function createSlider(txt, order, key, min, max, suffix, desc)
+    local card = createCard()
+    card.LayoutOrder = order
+    card.Size = UDim2.new(1, 0, 0, 75)
+    
+    local title = Instance.new("TextLabel")
+    title.Parent = card
+    title.BackgroundTransparency = 1
+    title.Size = UDim2.new(0.5, 0, 0, 20)
+    title.Font = Enum.Font.GothamBold
+    title.Text = txt
+    title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    title.TextSize = 15
+    title.TextXAlignment = Enum.TextXAlignment.Left
+    
     local sub = Instance.new("TextLabel")
-    sub.Parent = container
+    sub.Parent = card
     sub.BackgroundTransparency = 1
-    sub.Position = UDim2.new(0, 0, 0, 22)
-    sub.Size = UDim2.new(1, -40, 0, 18)
+    sub.Position = UDim2.new(0, 0, 0, 20)
+    sub.Size = UDim2.new(1, 0, 0, 16)
     sub.Font = Enum.Font.Gotham
-    sub.Text = description or "Drag to adjust."
-    sub.TextColor3 = Color3.fromRGB(145, 145, 145)
-    sub.TextSize = 13
+    sub.Text = desc
+    sub.TextColor3 = Color3.fromRGB(130, 130, 130)
+    sub.TextSize = 12
     sub.TextXAlignment = Enum.TextXAlignment.Left
-
-    local valueLabel = Instance.new("TextLabel")
-    valueLabel.Parent = container
-    valueLabel.BackgroundTransparency = 1
-    valueLabel.Position = UDim2.new(1, -90, 0, 0)
-    valueLabel.Size = UDim2.new(0, 80, 0, 22)
-    valueLabel.Font = Enum.Font.GothamBold
-    valueLabel.Text = string.format("%.1f", state[stateKey]) .. suffix
-    valueLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-    valueLabel.TextSize = 16
-    valueLabel.TextXAlignment = Enum.TextXAlignment.Right
-
-    local sliderTrack = Instance.new("Frame")
-    sliderTrack.Name = "Track"
-    sliderTrack.Parent = container
-    sliderTrack.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-    sliderTrack.BorderSizePixel = 0
-    sliderTrack.Position = UDim2.new(0, 0, 1, -18)
-    sliderTrack.Size = UDim2.new(1, 0, 0, 6)
-
-    local trackCorner = Instance.new("UICorner")
-    trackCorner.CornerRadius = UDim.new(1, 0)
-    trackCorner.Parent = sliderTrack
-
-    local fraction = (state[stateKey] - min) / (max - min)
-
-    local sliderFill = Instance.new("Frame")
-    sliderFill.Name = "Fill"
-    sliderFill.Parent = sliderTrack
-    sliderFill.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
-    sliderFill.BorderSizePixel = 0
-    sliderFill.Size = UDim2.new(fraction, 0, 1, 0)
-
-    local fillCorner = Instance.new("UICorner")
-    fillCorner.CornerRadius = UDim.new(1, 0)
-    fillCorner.Parent = sliderFill
-
-    local sliderButton = Instance.new("TextButton")
-    sliderButton.Name = "Button"
-    sliderButton.Parent = sliderTrack
-    sliderButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    sliderButton.BorderSizePixel = 0
-    sliderButton.Position = UDim2.new(fraction, -8, 0.5, -8)
-    sliderButton.Size = UDim2.new(0, 16, 0, 16)
-    sliderButton.Text = ""
-    sliderButton.AutoButtonColor = false
-    sliderButton.ZIndex = 2
-
-    local buttonCorner = Instance.new("UICorner")
-    buttonCorner.CornerRadius = UDim.new(1, 0)
-    buttonCorner.Parent = sliderButton
-
-    local dragging = false
-
-    sliderButton.InputBegan:Connect(function(input)
+    
+    local val = Instance.new("TextLabel")
+    val.Parent = card
+    val.BackgroundTransparency = 1
+    val.Position = UDim2.new(1, -80, 0, 0)
+    val.Size = UDim2.new(0, 75, 0, 20)
+    val.Font = Enum.Font.GothamBold
+    val.Text = string.format("%.1f", state[key]) .. suffix
+    val.TextColor3 = Color3.fromRGB(200, 200, 200)
+    val.TextSize = 14
+    val.TextXAlignment = Enum.TextXAlignment.Right
+    
+    local track = Instance.new("Frame")
+    track.Parent = card
+    track.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    track.BorderSizePixel = 0
+    track.Position = UDim2.new(0, 0, 1, -16)
+    track.Size = UDim2.new(1, 0, 0, 5)
+    
+    Instance.new("UICorner", track).CornerRadius = UDim.new(1, 0)
+    
+    local frac = (state[key] - min) / (max - min)
+    
+    local fill = Instance.new("Frame")
+    fill.Parent = track
+    fill.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    fill.BorderSizePixel = 0
+    fill.Size = UDim2.new(frac, 0, 1, 0)
+    
+    Instance.new("UICorner", fill).CornerRadius = UDim.new(1, 0)
+    
+    local sliderBtn = Instance.new("TextButton")
+    sliderBtn.Parent = track
+    sliderBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    sliderBtn.BorderSizePixel = 0
+    sliderBtn.Position = UDim2.new(frac, -7, 0.5, -7)
+    sliderBtn.Size = UDim2.new(0, 14, 0, 14)
+    sliderBtn.Text = ""
+    sliderBtn.ZIndex = 2
+    
+    Instance.new("UICorner", sliderBtn).CornerRadius = UDim.new(1, 0)
+    
+    local drag = false
+    
+    sliderBtn.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = true
+            drag = true
         end
     end)
-
+    
     UserInputService.InputChanged:Connect(function(input)
-        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-            local mousePos = UserInputService:GetMouseLocation()
-            local trackPos = sliderTrack.AbsolutePosition
-            local trackSize = sliderTrack.AbsoluteSize
-            local relativePos = math.clamp((mousePos.X - trackPos.X) / trackSize.X, 0, 1)
-
-            state[stateKey] = min + (max - min) * relativePos
-            sliderButton.Position = UDim2.new(relativePos, -8, 0.5, -8)
-            sliderFill.Size = UDim2.new(relativePos, 0, 1, 0)
-            valueLabel.Text = string.format("%.1f", state[stateKey]) .. suffix
-
+        if drag and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local mouse = UserInputService:GetMouseLocation()
+            local pos = (mouse.X - track.AbsolutePosition.X) / track.AbsoluteSize.X
+            pos = math.clamp(pos, 0, 1)
+            
+            state[key] = min + (max - min) * pos
+            sliderBtn.Position = UDim2.new(pos, -7, 0.5, -7)
+            fill.Size = UDim2.new(pos, 0, 1, 0)
+            val.Text = string.format("%.1f", state[key]) .. suffix
+            
             updateFeatures()
         end
     end)
-
+    
     UserInputService.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = false
+            drag = false
         end
     end)
 end
 
--- create controls
-createToggle("Tank Mode", 1, "tankEnabled", "Massive resistance and anti‑death routines.")
-createSlider("Damage Resistance", 2, "damageReduction", 0, 100, "%", "Percentage of damage blocked.")
-createToggle("Reach Extended", 3, "reachEnabled", "Expands your melee hitbox radius.")
-createToggle("Visualize Hitbox", 4, "visualizeHitbox", "Show reach hitbox as a white cube.")
-createSlider("Damage Multiplier", 5, "damageMultiplier", 1, 10, "x", "Scales base damage dealt.")
-createSlider("Reach Distance", 6, "reachDistance", 1, 20, " studs", "Size of the reach hitbox cube.")
+-- Create controls
+createToggle("Tank Mode", 1, "tankEnabled", "Massive resistance and anti-death")
+createSlider("Damage Resistance", 2, "damageReduction", 0, 100, "%", "Damage blocked percentage")
+createToggle("Reach Extended", 3, "reachEnabled", "Extended melee hitbox")
+createToggle("Visualize Hitbox", 4, "visualizeHitbox", "Show reach box")
+createSlider("Damage Multiplier", 5, "damageMultiplier", 1, 10, "x", "Damage scaling")
+createSlider("Reach Distance", 6, "reachDistance", 1, 20, " studs", "Hitbox cube size")
 
--- draggable hub
-local draggingFrame = false
-local dragInput, dragStart, startPos
+-- Draggable
+local drag, dragStart, startPos
 
 local function updateDrag(input)
     local delta = input.Position - dragStart
-    TweenService:Create(
-        mainFrame,
-        TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-        {Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)}
-    ):Play()
+    mainFrame.Position = UDim2.new(
+        startPos.X.Scale, startPos.X.Offset + delta.X,
+        startPos.Y.Scale, startPos.Y.Offset + delta.Y
+    )
 end
 
-titleBar.InputBegan:Connect(function(input)
+userPanel.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        draggingFrame = true
+        drag = true
         dragStart = input.Position
         startPos = mainFrame.Position
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                draggingFrame = false
-            end
-        end)
-    end
-end)
-
-titleBar.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement then
-        dragInput = input
     end
 end)
 
 UserInputService.InputChanged:Connect(function(input)
-    if input == dragInput and draggingFrame then
+    if drag and input.UserInputType == Enum.UserInputType.MouseMovement then
         updateDrag(input)
     end
 end)
 
--- entrance animation
-mainFrame.Size = UDim2.new(0, 0, 0, 0)
-mainFrame.Visible = true
-TweenService:Create(
-    mainFrame,
-    TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
-    {Size = UDim2.new(0, 520, 0, 480)}
-):Play()
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        drag = false
+    end
+end)
 
--- toggle with Right Shift
-UserInputService.InputBegan:Connect(function(input, processed)
-    if not processed and input.KeyCode == Enum.KeyCode.RightShift then
+-- Entrance
+mainFrame.Size = UDim2.new(0, 0, 0, 0)
+TweenService:Create(mainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+    Size = UDim2.new(0, 600, 0, 560)
+}):Play()
+
+-- Toggle UI (Right Shift)
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if not gpe and input.KeyCode == Enum.KeyCode.RightShift then
         if mainFrame.Visible then
-            TweenService:Create(
-                mainFrame,
-                TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.In),
-                {Size = UDim2.new(0, 0, 0, 0)}
-            ):Play()
+            TweenService:Create(mainFrame, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
+                Size = UDim2.new(0, 0, 0, 0)
+            }):Play()
+            TweenService:Create(bgDim, TweenInfo.new(0.25), {BackgroundTransparency = 1}):Play()
             task.wait(0.25)
             mainFrame.Visible = false
+            bgDim.Visible = false
         else
+            bgDim.Visible = true
             mainFrame.Visible = true
-            TweenService:Create(
-                mainFrame,
-                TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
-                {Size = UDim2.new(0, 520, 0, 480)}
-            ):Play()
+            TweenService:Create(bgDim, TweenInfo.new(0.25), {BackgroundTransparency = 0.5}):Play()
+            TweenService:Create(mainFrame, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+                Size = UDim2.new(0, 600, 0, 560)
+            }):Play()
         end
     end
 end)
 
--- == FEATURE IMPLEMENTATION ==
+-- Features
 function updateFeatures()
+    for key, conn in pairs(state.connections) do
+        pcall(function()
+            if type(conn) == "thread" then
+                task.cancel(conn)
+            elseif conn.Disconnect then
+                conn:Disconnect()
+            end
+        end)
+    end
+    state.connections = {}
+    
+    local char = player.Character
+    if not char then return end
+    local hum = char:FindFirstChild("Humanoid")
+    if not hum then return end
+    
     -- Tank Mode
     if state.tankEnabled then
-        local humanoid = character:FindFirstChild("Humanoid")
-        local rootPart = character:FindFirstChild("HumanoidRootPart")
-
-        if humanoid and rootPart then
-            for connName, conn in pairs(state.connections) do
-                if connName:match("^tank") and conn then
-                    if type(conn) == "thread" then
-                        task.cancel(conn)
-                    elseif conn.Disconnect then
-                        conn:Disconnect()
-                    end
-                    state.connections[connName] = nil
-                end
+        local refHealth = 999999
+        
+        hum.MaxHealth = 999999
+        hum.Health = 999999
+        
+        state.connections.healthChanged = hum.HealthChanged:Connect(function(newHealth)
+            if not state.tankEnabled then return end
+            
+            if newHealth <= 0 or newHealth < refHealth * 0.5 then
+                hum.Health = 999999
+                refHealth = 999999
+            else
+                local damage = refHealth - newHealth
+                local reduced = damage * (1 - state.damageReduction / 100)
+                hum.Health = math.max(newHealth + reduced, 1)
+                refHealth = hum.Health
             end
-
-            for _, part in ipairs(character:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    if not part:GetAttribute("OriginalMassless") then
-                        part:SetAttribute("OriginalMassless", part.Massless)
-                        part:SetAttribute("OriginalCanCollide", part.CanCollide)
-                    end
-                    part.Massless = true
-                    if not part:GetAttribute("TankCollisionSet") then
-                        pcall(function()
-                            part.CollisionGroup = "TankMode"
-                        end)
-                        part:SetAttribute("TankCollisionSet", true)
-                    end
-                end
-            end
-
-            humanoid.MaxHealth = math.huge
-            task.wait()
-            humanoid.Health = math.huge
-            local refHealth = humanoid.Health
-
-            state.connections.tankStepped = RunService.Stepped:Connect(function()
-                if not state.tankEnabled then return end
+        end)
+        
+        state.connections.stateChanged = hum.StateChanged:Connect(function(old, new)
+            if state.tankEnabled and new == Enum.HumanoidStateType.Dead then
                 pcall(function()
-                    if humanoid.Health <= 0 or humanoid:GetState() == Enum.HumanoidStateType.Dead then
-                        humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
-                        humanoid.Health = math.huge
-                    elseif state.damageReduction >= 100 then
-                        humanoid.Health = math.huge
-                    elseif humanoid.Health < refHealth then
-                        local damage = refHealth - humanoid.Health
-                        humanoid.Health = humanoid.Health + (damage * state.damageReduction / 100)
-                    end
-                    refHealth = humanoid.Health
-                end)
-            end)
-
-            state.connections.tankHeartbeat = RunService.Heartbeat:Connect(function()
-                if not state.tankEnabled then return end
-                pcall(function()
-                    if humanoid.Health <= 0 then
-                        humanoid.Health = math.huge
-                        refHealth = math.huge
-                    elseif state.damageReduction >= 100 and humanoid.Health ~= math.huge then
-                        humanoid.Health = math.huge
-                        refHealth = math.huge
-                    end
-                end)
-            end)
-
-            state.connections.tankState = humanoid.StateChanged:Connect(function(_, newState)
-                if state.tankEnabled and newState == Enum.HumanoidStateType.Dead then
-                    pcall(function()
-                        humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
-                        task.wait()
-                        humanoid.Health = math.huge
-                        refHealth = math.huge
-                    end)
-                end
-            end)
-
-            state.connections.tankDied = humanoid.Died:Connect(function()
-                if state.tankEnabled then
-                    pcall(function()
-                        task.wait()
-                        humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
-                        humanoid.Health = math.huge
-                        refHealth = math.huge
-                    end)
-                end
-            end)
-
-            state.connections.tankLoop = task.spawn(function()
-                while state.tankEnabled do
-                    local success = pcall(function()
-                        if humanoid and humanoid.Parent then
-                            if humanoid.Health <= 0 or humanoid:GetState() == Enum.HumanoidStateType.Dead then
-                                humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
-                                humanoid.Health = math.huge
-                                refHealth = math.huge
-                            elseif state.damageReduction >= 100 and humanoid.Health < math.huge then
-                                humanoid.Health = math.huge
-                                refHealth = math.huge
-                            end
-                        end
-                    end)
-                    if not success or not humanoid or not humanoid.Parent then
-                        return
-                    end
-                    task.wait()
-                end
-            end)
-
-            if not character:FindFirstChild("TankFF") then
-                local ff = Instance.new("ForceField")
-                ff.Name = "TankFF"
-                ff.Visible = false
-                ff.Parent = character
-            end
-
-            state.connections.tankChildAdded = character.ChildAdded:Connect(function(child)
-                if state.tankEnabled and (child:IsA("Script") or child:IsA("LocalScript")) then
-                    local n = child.Name:lower()
-                    if n:find("damage") or n:find("hurt") or n:find("dmg") then
-                        pcall(function()
-                            child:Destroy()
-                        end)
-                    end
-                end
-            end)
-        end
-    else
-        for connName, conn in pairs(state.connections) do
-            if connName:match("^tank") then
-                if type(conn) == "thread" then
-                    pcall(function() task.cancel(conn) end)
-                elseif conn and conn.Disconnect then
-                    pcall(function() conn:Disconnect() end)
-                end
-                state.connections[connName] = nil
-            end
-        end
-
-        local humanoid = character:FindFirstChild("Humanoid")
-        if humanoid then
-            pcall(function()
-                humanoid.MaxHealth = 100
-                humanoid.Health = 100
-            end)
-        end
-
-        for _, part in ipairs(character:GetDescendants()) do
-            if part:IsA("BasePart") then
-                pcall(function()
-                    if part:GetAttribute("OriginalMassless") ~= nil then
-                        part.Massless = part:GetAttribute("OriginalMassless")
-                        part.CanCollide = part:GetAttribute("OriginalCanCollide")
-                        part:SetAttribute("OriginalMassless", nil)
-                        part:SetAttribute("OriginalCanCollide", nil)
-                        part:SetAttribute("TankCollisionSet", nil)
-                    end
-                    part.CollisionGroup = "Default"
+                    hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+                    task.wait(0.1)
+                    hum.Health = 999999
+                    refHealth = 999999
                 end)
             end
-        end
-
-        local ff = character:FindFirstChild("TankFF")
-        if ff then pcall(function() ff:Destroy() end) end
-    end
-
-    -- Reach (visual only)
-    if state.reachEnabled then
-        for _, tool in ipairs(character:GetChildren()) do
-            if tool:IsA("Tool") then
-                local handle = tool:FindFirstChild("Handle")
-                if handle and not handle:FindFirstChild("ReachHitbox") then
-                    local hitbox = Instance.new("Part")
-                    hitbox.Name = "ReachHitbox"
-                    hitbox.Size = Vector3.new(state.reachDistance, state.reachDistance, state.reachDistance)
-                    hitbox.CFrame = handle.CFrame
-                    hitbox.Transparency = state.visualizeHitbox and 0.7 or 1
-                    hitbox.Material = Enum.Material.ForceField
-                    hitbox.Color = Color3.fromRGB(255, 255, 255)
-                    hitbox.CanCollide = false
-                    hitbox.Massless = true
-                    hitbox.Anchored = false  -- no physics influence on character
-                    hitbox.Parent = handle
-
-                    local weld = Instance.new("WeldConstraint")
-                    weld.Part0 = handle
-                    weld.Part1 = hitbox
-                    weld.Parent = hitbox
-
-                    table.insert(state.hitboxParts, hitbox)
-
-                    -- purely visual: NO .Touched damage handlers here
-                end
+        end)
+        
+        state.connections.heartbeat = RunService.Heartbeat:Connect(function()
+            if not state.tankEnabled then return end
+            if hum.Health <= 0 or hum:GetState() == Enum.HumanoidStateType.Dead then
+                pcall(function()
+                    hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+                    hum.Health = 999999
+                    refHealth = 999999
+                end)
             end
-        end
-
-        for _, hitbox in ipairs(state.hitboxParts) do
-            if hitbox and hitbox.Parent then
-                hitbox.Size = Vector3.new(state.reachDistance, state.reachDistance, state.reachDistance)
-                hitbox.Transparency = state.visualizeHitbox and 0.7 or 1
-            end
-        end
+        end)
     else
-        for _, hitbox in ipairs(state.hitboxParts) do
-            if hitbox and hitbox.Parent then
-                hitbox:Destroy()
+        pcall(function()
+            if hum then
+                hum.MaxHealth = 100
+                hum.Health = 100
             end
-        end
-        state.hitboxParts = {}
+        end)
     end
-
-    if not state.reachEnabled and state.visualizeHitbox then
-        state.visualizeHitbox = false
-    end
-
-    if state.visualizeHitbox then
-        for _, hitbox in ipairs(state.hitboxParts) do
-            if hitbox and hitbox.Parent then
-                hitbox.Transparency = 0.7
-            end
-        end
-    else
-        for _, hitbox in ipairs(state.hitboxParts) do
-            if hitbox and hitbox.Parent then
-                hitbox.Transparency = 1
-            end
-        end
-    end
-end
-
-updateFeatures()
-
-player.CharacterAdded:Connect(function(newCharacter)
-    character = newCharacter
-    state.hitboxParts = {}
-
-    local humanoid = character:WaitForChild("Humanoid")
-    state.originalHealth = humanoid.Health
-
-    task.wait(0.1)
-    updateFeatures()
-end)
-
-character.ChildAdded:Connect(function(child)
-    if child:IsA("Tool") then
-        task.wait(0.1)
-        updateFeatures()
-    end
-end)
-
-character.ChildRemoved:Connect(function(child)
-    if child:IsA("Tool") then
-        for i = #state.hitboxParts, 1, -1 do
-            local hitbox = state.hitboxParts[i]
-            if hitbox and not hitbox.Parent then
-                table.remove(state.hitboxParts, i)
-            end
-        end
-    end
-end)
-
-local function cleanup()
-    for _, conn in pairs(state.connections) do
-        if conn and conn.Disconnect then
-            conn:Disconnect()
-        end
-    end
+    
+    -- Reach
     for _, hitbox in ipairs(state.hitboxParts) do
         if hitbox and hitbox.Parent then
             hitbox:Destroy()
         end
     end
-    if screenGui then
-        screenGui:Destroy()
+    state.hitboxParts = {}
+    
+    if state.reachEnabled then
+        local function setupReach(tool)
+            local handle = tool:FindFirstChild("Handle") or tool:FindFirstChildOfClass("Part")
+            if not handle then return end
+            
+            local hitbox = Instance.new("Part")
+            hitbox.Name = "ReachHitbox"
+            hitbox.Size = Vector3.new(state.reachDistance, state.reachDistance, state.reachDistance)
+            hitbox.CFrame = handle.CFrame
+            hitbox.Transparency = state.visualizeHitbox and 0.7 or 1
+            hitbox.Material = Enum.Material.ForceField
+            hitbox.Color = Color3.fromRGB(255, 255, 255)
+            hitbox.CanCollide = false
+            hitbox.Massless = true
+            hitbox.Anchored = false
+            hitbox.Parent = workspace
+            
+            local weld = Instance.new("WeldConstraint")
+            weld.Part0 = handle
+            weld.Part1 = hitbox
+            weld.Parent = hitbox
+            
+            table.insert(state.hitboxParts, hitbox)
+            
+            local lastDamage = {}
+            local isSwinging = false
+            local swingCD = false
+            
+            local function onSwing()
+                if swingCD then return end
+                isSwinging = true
+                swingCD = true
+                
+                task.delay(0.5, function()
+                    isSwinging = false
+                end)
+                
+                task.delay(0.6, function()
+                    swingCD = false
+                end)
+            end
+            
+            tool.Activated:Connect(onSwing)
+            
+            local lastPos = handle.Position
+            state.connections["swing_" .. tostring(hitbox)] = RunService.Heartbeat:Connect(function()
+                if (handle.Position - lastPos).Magnitude > 0.5 then
+                    if not swingCD then
+                        onSwing()
+                    end
+                end
+                lastPos = handle.Position
+            end)
+            
+            hitbox.Touched:Connect(function(hit)
+                if not state.reachEnabled or not isSwinging then return end
+                
+                local enemy = hit.Parent
+                if enemy and enemy ~= char and enemy:FindFirstChild("Humanoid") then
+                    local enemyHum = enemy.Humanoid
+                    if enemyHum.Health > 0 then
+                        local time = tick()
+                        local id = tostring(enemy)
+                        
+                        if not lastDamage[id] or time - lastDamage[id] > 0.6 then
+                            lastDamage[id] = time
+                            local dmg = 20 * state.damageMultiplier
+                            local newHP = enemyHum.Health - dmg
+                            
+                            if newHP <= 0 then
+                                enemyHum.Health = 0
+                                enemyHum:ChangeState(Enum.HumanoidStateType.Dead)
+                                pcall(function()
+                                    enemy:BreakJoints()
+                                end)
+                            else
+                                enemyHum.Health = newHP
+                            end
+                        end
+                    end
+                end
+            end)
+            
+            state.connections["reach_" .. tostring(hitbox)] = RunService.Heartbeat:Connect(function()
+                if hitbox and hitbox.Parent and handle and handle.Parent then
+                    hitbox.Transparency = state.visualizeHitbox and 0.7 or 1
+                    hitbox.Size = Vector3.new(state.reachDistance, state.reachDistance, state.reachDistance)
+                else
+                    if hitbox and hitbox.Parent then
+                        hitbox:Destroy()
+                    end
+                end
+            end)
+        end
+        
+        for _, item in ipairs(char:GetChildren()) do
+            if item:IsA("Tool") then
+                setupReach(item)
+            end
+        end
+        
+        state.connections.childAdded = char.ChildAdded:Connect(function(child)
+            if child:IsA("Tool") and state.reachEnabled then
+                task.wait(0.1)
+                setupReach(child)
+            end
+        end)
     end
 end
 
-StarterGui:SetCore("SendNotification", {
-    Title = "KOAS ZONE",
-    Text = "Loaded! Press Right Shift to toggle.",
-    Duration = 5,
-})
+task.wait(0.5)
+updateFeatures()
+
+player.CharacterAdded:Connect(function(newChar)
+    character = newChar
+    humanoid = newChar:WaitForChild("Humanoid")
+    state.hitboxParts = {}
+    task.wait(0.5)
+    updateFeatures()
+end)
+
+pcall(function()
+    game:GetService("StarterGui"):SetCore("SendNotification", {
+        Title = "KOAS ZONE PREMIUM",
+        Text = "Loaded! Press Right Shift to toggle.",
+        Duration = 5,
+    })
+end)
 
 print("━━━━━━━━━━━━━━━━━━━━━━━━━")
-print("   KOAS ZONE LOADED")
+print("  KOAS ZONE PREMIUM")
 print("━━━━━━━━━━━━━━━━━━━━━━━━━")
-print("Press Right Shift to toggle UI")
+print("Right Shift = Toggle UI")
 print("━━━━━━━━━━━━━━━━━━━━━━━━━")
