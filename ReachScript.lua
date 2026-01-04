@@ -25,12 +25,17 @@ local state = {
     tankEnabled = false,
     reachEnabled = false,
     visualizeHitbox = false,
-    damageMultiplier = 1,
-    damageReduction = 50,
     reachDistance = 8,
     hitboxParts = {},
     connections = {},
-    originalHealth = humanoid.Health or 100
+    originalHealth = humanoid.Health or 100,
+    keybinds = {
+        toggleUI = Enum.KeyCode.RightControl,
+        reachIncrease = Enum.KeyCode.J,
+        reachDecrease = Enum.KeyCode.K,
+        toggleReach = Enum.KeyCode.Q,
+        toggleTank = Enum.KeyCode.Z
+    }
 }
 
 -- Splash Screen
@@ -103,12 +108,6 @@ screenGui.Name = "KoasZoneHub"
 screenGui.Parent = player:WaitForChild("PlayerGui")
 screenGui.ResetOnSpawn = false
 screenGui.IgnoreGuiInset = true
-
-local bgDim = Instance.new("Frame")
-bgDim.Parent = screenGui
-bgDim.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-bgDim.BackgroundTransparency = 0.5
-bgDim.Size = UDim2.new(1, 0, 1, 0)
 
 local mainFrame = Instance.new("Frame")
 mainFrame.Parent = screenGui
@@ -315,7 +314,6 @@ closeBtn.MouseButton1Click:Connect(function()
     TweenService:Create(mainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
         Size = UDim2.new(0, 0, 0, 0)
     }):Play()
-    TweenService:Create(bgDim, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play()
     task.wait(0.3)
     screenGui:Destroy()
 end)
@@ -521,6 +519,7 @@ local function createSlider(txt, order, key, min, max, suffix, desc)
     sub.TextXAlignment = Enum.TextXAlignment.Left
     
     local val = Instance.new("TextLabel")
+    val.Name = "ValueLabel"
     val.Parent = card
     val.BackgroundTransparency = 1
     val.Position = UDim2.new(1, -80, 0, 0)
@@ -532,6 +531,7 @@ local function createSlider(txt, order, key, min, max, suffix, desc)
     val.TextXAlignment = Enum.TextXAlignment.Right
     
     local track = Instance.new("Frame")
+    track.Name = "Track"
     track.Parent = card
     track.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
     track.BorderSizePixel = 0
@@ -543,6 +543,7 @@ local function createSlider(txt, order, key, min, max, suffix, desc)
     local frac = (state[key] - min) / (max - min)
     
     local fill = Instance.new("Frame")
+    fill.Name = "Fill"
     fill.Parent = track
     fill.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     fill.BorderSizePixel = 0
@@ -551,6 +552,7 @@ local function createSlider(txt, order, key, min, max, suffix, desc)
     Instance.new("UICorner", fill).CornerRadius = UDim.new(1, 0)
     
     local sliderBtn = Instance.new("TextButton")
+    sliderBtn.Name = "SliderButton"
     sliderBtn.Parent = track
     sliderBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     sliderBtn.BorderSizePixel = 0
@@ -589,15 +591,181 @@ local function createSlider(txt, order, key, min, max, suffix, desc)
             drag = false
         end
     end)
+    
+    card:SetAttribute("StateKey", key)
+    card:SetAttribute("Min", min)
+    card:SetAttribute("Max", max)
+    card:SetAttribute("Suffix", suffix)
+    
+    return card
 end
 
 -- Create controls
-createToggle("Tank Mode", 1, "tankEnabled", "Massive resistance and anti-death")
-createSlider("Damage Resistance", 2, "damageReduction", 0, 100, "%", "Damage blocked percentage")
-createToggle("Reach Extended", 3, "reachEnabled", "Extended melee hitbox")
-createToggle("Visualize Hitbox", 4, "visualizeHitbox", "Show reach box")
-createSlider("Damage Multiplier", 5, "damageMultiplier", 1, 10, "x", "Damage scaling")
-createSlider("Reach Distance", 6, "reachDistance", 1, 20, " studs", "Hitbox cube size")
+createToggle("Tank Mode", 1, "tankEnabled", "Invincibility while holding weapon")
+createToggle("Reach Extended", 2, "reachEnabled", "Extended melee range")
+createToggle("Visualize Hitbox", 3, "visualizeHitbox", "Show reach sphere (barely visible)")
+local reachSlider = createSlider("Reach Distance", 4, "reachDistance", 5, 25, " studs", "Attack range distance")
+
+-- Function to update slider visually from keybinds
+local function updateSliderVisual(sliderCard)
+    local key = sliderCard:GetAttribute("StateKey")
+    local min = sliderCard:GetAttribute("Min")
+    local max = sliderCard:GetAttribute("Max")
+    local suffix = sliderCard:GetAttribute("Suffix")
+    
+    local val = sliderCard:FindFirstChild("ValueLabel")
+    local track = sliderCard:FindFirstChild("Track")
+    if not val or not track then return end
+    
+    local fill = track:FindFirstChild("Fill")
+    local sliderBtn = track:FindFirstChild("SliderButton")
+    if not fill or not sliderBtn then return end
+    
+    local frac = (state[key] - min) / (max - min)
+    
+    TweenService:Create(sliderBtn, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {
+        Position = UDim2.new(frac, -7, 0.5, -7)
+    }):Play()
+    
+    TweenService:Create(fill, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {
+        Size = UDim2.new(frac, 0, 1, 0)
+    }):Play()
+    
+    val.Text = string.format("%.1f", state[key]) .. suffix
+    
+    TweenService:Create(val, TweenInfo.new(0.1), {TextColor3 = Color3.fromRGB(100, 255, 100)}):Play()
+    task.delay(0.2, function()
+        TweenService:Create(val, TweenInfo.new(0.2), {TextColor3 = Color3.fromRGB(200, 200, 200)}):Play()
+    end)
+end
+
+-- Keybinds Section
+local keybindsCard = createCard()
+keybindsCard.LayoutOrder = 5
+keybindsCard.Size = UDim2.new(1, 0, 0, 230)
+
+local keybindsTitle = Instance.new("TextLabel")
+keybindsTitle.Parent = keybindsCard
+keybindsTitle.BackgroundTransparency = 1
+keybindsTitle.Size = UDim2.new(1, 0, 0, 24)
+keybindsTitle.Font = Enum.Font.GothamBold
+keybindsTitle.Text = "KEYBINDS"
+keybindsTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+keybindsTitle.TextSize = 18
+keybindsTitle.TextXAlignment = Enum.TextXAlignment.Left
+
+local keybindsSubtitle = Instance.new("TextLabel")
+keybindsSubtitle.Parent = keybindsCard
+keybindsSubtitle.BackgroundTransparency = 1
+keybindsSubtitle.Position = UDim2.new(0, 0, 0, 24)
+keybindsSubtitle.Size = UDim2.new(1, 0, 0, 18)
+keybindsSubtitle.Font = Enum.Font.Gotham
+keybindsSubtitle.Text = "Click any button to set a custom keybind"
+keybindsSubtitle.TextColor3 = Color3.fromRGB(130, 130, 130)
+keybindsSubtitle.TextSize = 12
+keybindsSubtitle.TextXAlignment = Enum.TextXAlignment.Left
+
+local keybindsLayout = Instance.new("UIListLayout")
+keybindsLayout.Parent = keybindsCard
+keybindsLayout.Padding = UDim.new(0, 6)
+keybindsLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+keybindsTitle.LayoutOrder = 0
+keybindsSubtitle.LayoutOrder = 1
+
+local function createKeybindButton(name, stateKey, description, order)
+    local container = Instance.new("Frame")
+    container.Parent = keybindsCard
+    container.BackgroundTransparency = 1
+    container.Size = UDim2.new(1, 0, 0, 28)
+    container.LayoutOrder = order
+    
+    local label = Instance.new("TextLabel")
+    label.Parent = container
+    label.BackgroundTransparency = 1
+    label.Size = UDim2.new(0.5, -5, 1, 0)
+    label.Font = Enum.Font.Gotham
+    label.Text = description
+    label.TextColor3 = Color3.fromRGB(180, 180, 180)
+    label.TextSize = 13
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    
+    local button = Instance.new("TextButton")
+    button.Parent = container
+    button.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    button.BorderSizePixel = 0
+    button.Position = UDim2.new(0.5, 5, 0, 0)
+    button.Size = UDim2.new(0.5, -5, 1, 0)
+    button.Font = Enum.Font.GothamBold
+    button.Text = state.keybinds[stateKey].Name
+    button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    button.TextSize = 12
+    button.AutoButtonColor = false
+    
+    Instance.new("UICorner", button).CornerRadius = UDim.new(0, 6)
+    
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(60, 60, 60)
+    stroke.Transparency = 0.5
+    stroke.Thickness = 1
+    stroke.Parent = button
+    
+    local listening = false
+    
+    button.MouseButton1Click:Connect(function()
+        if listening then return end
+        listening = true
+        button.Text = "Press any key..."
+        button.TextColor3 = Color3.fromRGB(255, 200, 100)
+        TweenService:Create(button, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(50, 50, 30)}):Play()
+        
+        local conn
+        conn = UserInputService.InputBegan:Connect(function(input, gpe)
+            if gpe then return end
+            if input.UserInputType == Enum.UserInputType.Keyboard then
+                state.keybinds[stateKey] = input.KeyCode
+                button.Text = input.KeyCode.Name
+                button.TextColor3 = Color3.fromRGB(100, 255, 100)
+                
+                task.delay(0.3, function()
+                    button.TextColor3 = Color3.fromRGB(255, 255, 255)
+                end)
+                
+                TweenService:Create(button, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(30, 30, 30)}):Play()
+                listening = false
+                conn:Disconnect()
+                
+                pcall(function()
+                    game:GetService("StarterGui"):SetCore("SendNotification", {
+                        Title = "Keybind Set",
+                        Text = description .. " → " .. input.KeyCode.Name,
+                        Duration = 2
+                    })
+                end)
+            end
+        end)
+    end)
+    
+    button.MouseEnter:Connect(function()
+        if not listening then
+            TweenService:Create(button, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(40, 40, 40)}):Play()
+            TweenService:Create(stroke, TweenInfo.new(0.15), {Transparency = 0.2}):Play()
+        end
+    end)
+    
+    button.MouseLeave:Connect(function()
+        if not listening then
+            TweenService:Create(button, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(30, 30, 30)}):Play()
+            TweenService:Create(stroke, TweenInfo.new(0.15), {Transparency = 0.5}):Play()
+        end
+    end)
+end
+
+createKeybindButton("Toggle UI", "toggleUI", "Toggle UI", 2)
+createKeybindButton("Toggle Reach", "toggleReach", "Reach On/Off", 3)
+createKeybindButton("Toggle Tank", "toggleTank", "Tank On/Off", 4)
+createKeybindButton("Reach +1", "reachIncrease", "Increase Reach", 5)
+createKeybindButton("Reach -1", "reachDecrease", "Decrease Reach", 6)
 
 -- Draggable
 local drag, dragStart, startPos
@@ -632,33 +800,77 @@ end)
 
 -- Entrance
 mainFrame.Size = UDim2.new(0, 0, 0, 0)
+mainFrame.Visible = true
 TweenService:Create(mainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
     Size = UDim2.new(0, 600, 0, 560)
 }):Play()
 
--- Toggle UI (Right Shift)
+-- Toggle UI keybinds
 UserInputService.InputBegan:Connect(function(input, gpe)
-    if not gpe and input.KeyCode == Enum.KeyCode.RightShift then
-        if mainFrame.Visible then
-            TweenService:Create(mainFrame, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
-                Size = UDim2.new(0, 0, 0, 0)
-            }):Play()
-            TweenService:Create(bgDim, TweenInfo.new(0.25), {BackgroundTransparency = 1}):Play()
-            task.wait(0.25)
-            mainFrame.Visible = false
-            bgDim.Visible = false
-        else
-            bgDim.Visible = true
-            mainFrame.Visible = true
-            TweenService:Create(bgDim, TweenInfo.new(0.25), {BackgroundTransparency = 0.5}):Play()
-            TweenService:Create(mainFrame, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-                Size = UDim2.new(0, 600, 0, 560)
-            }):Play()
+    if gpe then return end
+    
+    if input.KeyCode == state.keybinds.toggleUI then
+        mainFrame.Visible = not mainFrame.Visible
+    end
+    
+    if input.KeyCode == state.keybinds.toggleReach then
+        state.reachEnabled = not state.reachEnabled
+        updateFeatures()
+        
+        pcall(function()
+            game:GetService("StarterGui"):SetCore("SendNotification", {
+                Title = "Reach Extended",
+                Text = state.reachEnabled and "ENABLED" or "DISABLED",
+                Duration = 2
+            })
+        end)
+    end
+    
+    if input.KeyCode == state.keybinds.toggleTank then
+        state.tankEnabled = not state.tankEnabled
+        updateFeatures()
+        
+        pcall(function()
+            game:GetService("StarterGui"):SetCore("SendNotification", {
+                Title = "Tank Mode",
+                Text = state.tankEnabled and "ENABLED" or "DISABLED",
+                Duration = 2
+            })
+        end)
+    end
+    
+    if input.KeyCode == state.keybinds.reachIncrease then
+        if state.reachDistance < 25 then
+            state.reachDistance = state.reachDistance + 1
+            updateSliderVisual(reachSlider)
+            
+            pcall(function()
+                game:GetService("StarterGui"):SetCore("SendNotification", {
+                    Title = "Reach Distance",
+                    Text = "Increased to " .. state.reachDistance .. " studs",
+                    Duration = 1.5
+                })
+            end)
+        end
+    end
+    
+    if input.KeyCode == state.keybinds.reachDecrease then
+        if state.reachDistance > 5 then
+            state.reachDistance = state.reachDistance - 1
+            updateSliderVisual(reachSlider)
+            
+            pcall(function()
+                game:GetService("StarterGui"):SetCore("SendNotification", {
+                    Title = "Reach Distance",
+                    Text = "Decreased to " .. state.reachDistance .. " studs",
+                    Duration = 1.5
+                })
+            end)
         end
     end
 end)
 
--- Features
+-- Features (NEW REACH SYSTEM)
 function updateFeatures()
     for key, conn in pairs(state.connections) do
         pcall(function()
@@ -671,63 +883,11 @@ function updateFeatures()
     end
     state.connections = {}
     
-    local char = player.Character
-    if not char then return end
-    local hum = char:FindFirstChild("Humanoid")
-    if not hum then return end
-    
-    -- Tank Mode
-    if state.tankEnabled then
-        local refHealth = 999999
-        
-        hum.MaxHealth = 999999
-        hum.Health = 999999
-        
-        state.connections.healthChanged = hum.HealthChanged:Connect(function(newHealth)
-            if not state.tankEnabled then return end
-            
-            if newHealth <= 0 or newHealth < refHealth * 0.5 then
-                hum.Health = 999999
-                refHealth = 999999
-            else
-                local damage = refHealth - newHealth
-                local reduced = damage * (1 - state.damageReduction / 100)
-                hum.Health = math.max(newHealth + reduced, 1)
-                refHealth = hum.Health
-            end
-        end)
-        
-        state.connections.stateChanged = hum.StateChanged:Connect(function(old, new)
-            if state.tankEnabled and new == Enum.HumanoidStateType.Dead then
-                pcall(function()
-                    hum:ChangeState(Enum.HumanoidStateType.GettingUp)
-                    task.wait(0.1)
-                    hum.Health = 999999
-                    refHealth = 999999
-                end)
-            end
-        end)
-        
-        state.connections.heartbeat = RunService.Heartbeat:Connect(function()
-            if not state.tankEnabled then return end
-            if hum.Health <= 0 or hum:GetState() == Enum.HumanoidStateType.Dead then
-                pcall(function()
-                    hum:ChangeState(Enum.HumanoidStateType.GettingUp)
-                    hum.Health = 999999
-                    refHealth = 999999
-                end)
-            end
-        end)
-    else
-        pcall(function()
-            if hum then
-                hum.MaxHealth = 100
-                hum.Health = 100
-            end
-        end)
+    for _, obj in pairs(workspace:GetChildren()) do
+        if obj.Name == "SwordReachVisual" then
+            obj:Destroy()
+        end
     end
-    
-    -- Reach
     for _, hitbox in ipairs(state.hitboxParts) do
         if hitbox and hitbox.Parent then
             hitbox:Destroy()
@@ -735,112 +895,116 @@ function updateFeatures()
     end
     state.hitboxParts = {}
     
-    if state.reachEnabled then
-        local function setupReach(tool)
-            local handle = tool:FindFirstChild("Handle") or tool:FindFirstChildOfClass("Part")
-            if not handle then return end
-            
-            local hitbox = Instance.new("Part")
-            hitbox.Name = "ReachHitbox"
-            hitbox.Size = Vector3.new(state.reachDistance, state.reachDistance, state.reachDistance)
-            hitbox.CFrame = handle.CFrame
-            hitbox.Transparency = state.visualizeHitbox and 0.7 or 1
-            hitbox.Material = Enum.Material.ForceField
-            hitbox.Color = Color3.fromRGB(255, 255, 255)
-            hitbox.CanCollide = false
-            hitbox.Massless = true
-            hitbox.Anchored = false
-            hitbox.Parent = workspace
-            
-            local weld = Instance.new("WeldConstraint")
-            weld.Part0 = handle
-            weld.Part1 = hitbox
-            weld.Parent = hitbox
-            
-            table.insert(state.hitboxParts, hitbox)
-            
-            local lastDamage = {}
-            local isSwinging = false
-            local swingCD = false
-            
-            local function onSwing()
-                if swingCD then return end
-                isSwinging = true
-                swingCD = true
-                
-                task.delay(0.5, function()
-                    isSwinging = false
-                end)
-                
-                task.delay(0.6, function()
-                    swingCD = false
-                end)
-            end
-            
-            tool.Activated:Connect(onSwing)
-            
-            local lastPos = handle.Position
-            state.connections["swing_" .. tostring(hitbox)] = RunService.Heartbeat:Connect(function()
-                if (handle.Position - lastPos).Magnitude > 0.5 then
-                    if not swingCD then
-                        onSwing()
+    local char = player.Character
+    if not char then return end
+    local hum = char:FindFirstChild("Humanoid")
+    if not hum then return end
+    
+    -- Tank Mode
+    if state.tankEnabled then
+        print("Tank Mode: ENABLED")
+        state.connections.tankLoop = RunService.Stepped:Connect(function()
+            if not state.tankEnabled then return end
+            pcall(function()
+                local hasTool = char:FindFirstChildOfClass("Tool") ~= nil
+                for _, part in ipairs(char:GetChildren()) do
+                    if part:IsA("Part") then
+                        part.CanTouch = hasTool
                     end
                 end
-                lastPos = handle.Position
             end)
+        end)
+    end
+    
+    -- NEW Reach System (Breaks joints like the reference script)
+    if state.reachEnabled then
+        print("Reach Extended: ENABLED - Distance: " .. state.reachDistance)
+        
+        state.connections.reachLoop = RunService.Stepped:Connect(function()
+            if not state.reachEnabled then return end
             
-            hitbox.Touched:Connect(function(hit)
-                if not state.reachEnabled or not isSwinging then return end
+            pcall(function()
+                local tool = char:FindFirstChildOfClass("Tool")
+                local swordHandle = tool and tool:FindFirstChild("Handle")
                 
-                local enemy = hit.Parent
-                if enemy and enemy ~= char and enemy:FindFirstChild("Humanoid") then
-                    local enemyHum = enemy.Humanoid
-                    if enemyHum.Health > 0 then
-                        local time = tick()
-                        local id = tostring(enemy)
+                if not swordHandle then 
+                    for _, obj in pairs(workspace:GetChildren()) do
+                        if obj.Name == "SwordReachVisual" then
+                            obj:Destroy()
+                        end
+                    end
+                    state.hitboxParts = {}
+                    return 
+                end
+                
+                -- Visual hitbox (if enabled)
+                if state.visualizeHitbox then
+                    for _, obj in pairs(workspace:GetChildren()) do
+                        if obj.Name == "SwordReachVisual" then
+                            obj:Destroy()
+                        end
+                    end
+                    
+                    local visualSphere = Instance.new("Part")
+                    visualSphere.Name = "SwordReachVisual"
+                    visualSphere.Shape = Enum.PartType.Ball
+                    visualSphere.Size = Vector3.new(state.reachDistance * 2, state.reachDistance * 2, state.reachDistance * 2)
+                    visualSphere.Transparency = 0.85
+                    visualSphere.Material = Enum.Material.ForceField
+                    visualSphere.Color = Color3.fromRGB(255, 100, 100)
+                    visualSphere.CanCollide = false
+                    visualSphere.CanTouch = false
+                    visualSphere.CanQuery = false
+                    visualSphere.Massless = true
+                    visualSphere.Anchored = true
+                    visualSphere.Parent = workspace
+                    
+                    local myTorso = char:FindFirstChild("Torso") or char:FindFirstChild("HumanoidRootPart")
+                    if myTorso then
+                        visualSphere.CFrame = CFrame.new(myTorso.Position)
+                    end
+                    state.hitboxParts = {visualSphere}
+                    
+                    local visualConn
+                    visualConn = RunService.Heartbeat:Connect(function()
+                        if not visualSphere.Parent then 
+                            visualConn:Disconnect() 
+                            return 
+                        end
+                        if myTorso and myTorso.Parent then
+                            visualSphere.CFrame = CFrame.new(myTorso.Position)
+                        else
+                            visualSphere:Destroy()
+                            visualConn:Disconnect()
+                        end
+                    end)
+                end
+                
+                -- REACH ATTACK LOGIC (Uses joint breaking like reference script)
+                local myTorso = char:FindFirstChild("Torso") or char:FindFirstChild("HumanoidRootPart")
+                if not myTorso then return end
+                
+                for _, v in pairs(Players:GetPlayers()) do 
+                    if v ~= player and v.Character and v.Character ~= char then
+                        local enemyTorso = v.Character:FindFirstChild("Torso") or v.Character:FindFirstChild("HumanoidRootPart")
+                        local enemyLeftArm = v.Character:FindFirstChild("Left Arm")
+                        local enemyLeftLeg = v.Character:FindFirstChild("Left Leg")
                         
-                        if not lastDamage[id] or time - lastDamage[id] > 0.6 then
-                            lastDamage[id] = time
-                            local dmg = 20 * state.damageMultiplier
-                            local newHP = enemyHum.Health - dmg
-                            
-                            if newHP <= 0 then
-                                enemyHum.Health = 0
-                                enemyHum:ChangeState(Enum.HumanoidStateType.Dead)
-                                pcall(function()
-                                    enemy:BreakJoints()
-                                end)
-                            else
-                                enemyHum.Health = newHP
+                        if enemyTorso and (myTorso.Position - enemyTorso.Position).Magnitude <= state.reachDistance then
+                            -- Break joints and teleport limbs (exact method from reference script)
+                            for _, limbName in ipairs({"Left Arm", "Left Leg"}) do
+                                local limb = v.Character:FindFirstChild(limbName)
+                                if limb then
+                                    limb:BreakJoints()
+                                    limb.Transparency = 1
+                                    limb.CanCollide = false
+                                    limb.CFrame = myTorso.CFrame * CFrame.new(1, 0, -3.5)
+                                end
                             end
                         end
                     end
                 end
             end)
-            
-            state.connections["reach_" .. tostring(hitbox)] = RunService.Heartbeat:Connect(function()
-                if hitbox and hitbox.Parent and handle and handle.Parent then
-                    hitbox.Transparency = state.visualizeHitbox and 0.7 or 1
-                    hitbox.Size = Vector3.new(state.reachDistance, state.reachDistance, state.reachDistance)
-                else
-                    if hitbox and hitbox.Parent then
-                        hitbox:Destroy()
-                    end
-                end
-            end)
-        end
-        
-        for _, item in ipairs(char:GetChildren()) do
-            if item:IsA("Tool") then
-                setupReach(item)
-            end
-        end
-        
-        state.connections.childAdded = char.ChildAdded:Connect(function(child)
-            if child:IsA("Tool") and state.reachEnabled then
-                task.wait(0.1)
-                setupReach(child)
-            end
         end)
     end
 end
@@ -859,7 +1023,7 @@ end)
 pcall(function()
     game:GetService("StarterGui"):SetCore("SendNotification", {
         Title = "KOAS ZONE PREMIUM",
-        Text = "Loaded! Press Right Shift to toggle.",
+        Text = "Loaded! Press Right Control to toggle UI.",
         Duration = 5,
     })
 end)
@@ -867,5 +1031,7 @@ end)
 print("━━━━━━━━━━━━━━━━━━━━━━━━━")
 print("  KOAS ZONE PREMIUM")
 print("━━━━━━━━━━━━━━━━━━━━━━━━━")
-print("Right Shift = Toggle UI")
+print("Right Control = Toggle UI")
+print("Q = Toggle Reach | Z = Toggle Tank")
+print("J = Reach +1 | K = Reach -1")
 print("━━━━━━━━━━━━━━━━━━━━━━━━━")
